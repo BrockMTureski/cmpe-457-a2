@@ -47,7 +47,7 @@ imageFT  = None                   # the image's FT as a 2D np.array
 # Filter
 
 filterDir      = 'filters'
-filterFilename = 'gaussian7'
+filterFilename = 'gaussian11'
 filterPath     = os.path.join( filterDir, filterFilename )
 
 filter   = None                   # the filter as a 2D np.array
@@ -80,7 +80,7 @@ def ft1D( signal ):
   return np.fft.fft( signal )
 
 def ift1D( signal ):
-  
+
   N = signal.size
   out = np.zeros(N, dtype=complex)
   for i in range(0,N-1):
@@ -167,9 +167,20 @@ def inverseFT( image ):
 
 def multiplyFTs( image, filter ):
 
-  # YOUR CODE HERE
+  filterSize = filter.shape
+  ySize = filterSize[0]
+  xSize = filterSize[1]
 
-  return image # (this is wrong) 
+  for y in range(ySize):
+    filter[y] = filter[y] * np.exp((2*np.pi*1j*y*(ySize/2))/ySize)
+
+  for x in range(xSize):
+    filter[:,x] = filter[:,x] * np.exp((2*np.pi*1j*x*(xSize/2))/xSize)
+
+  return (filter*image)
+
+
+
 
 
 
@@ -819,10 +830,49 @@ def mouseMotion( x, y ):
 
 
 def modulatePixels( image, x, y, isFT ):
+  imgSize = image.shape
+  ySize = imgSize[0]
+  xSize = imgSize[1]
+  
+  stdDev = radius/2
 
-  # YOUR CODE HERE
+  #iterate through a radius*radius square of pixels around point clicked in image
+  #radius is furthest possible value from origin affected by modulation, therefore
+  #that is furthest needed
+  for y2 in range(int(y)-radius,int(y)+radius):
+    for x2 in range(int(x)-radius,int(x)+radius):
+      #edge case, skip iteration if pixel out of image bounds
+      if y2<0 or y2>ySize-1 or x2<0 or x2>xSize-1:
+        continue
+      #calculate euclidean distance from center pixel.
+      d = np.sqrt(np.square(x-x2) + np.square(y-y2))
+      #get pre modulated pixel value
+      pixelValue = image[y2][x2]
+      #initialize gaussian value to 0
+      gaussian = 0
+      #check if pixel distance is within radius, if it is set gaussian value
+      #the 0 term in exponent is because mean distance is 0 because
+      #distribution is even around center of radius
+      if d <= radius:
+        gaussian = 1/(stdDev*np.sqrt(2*np.pi)) * np.exp((-1/2)*((d-0)/stdDev)**2)
 
-  pass
+      #set pixel value to log of pixel value if FT
+      if isFT:
+        pixelValue = np.log(pixelValue)
+
+      #check mode and apply gaussian accordingly
+      if editMode == 's':
+        pixelValue = pixelValue*1 + 0.1*gaussian
+      if editMode == 'a':
+        pixelValue == pixelValue*1 - gaussian
+      
+      #restore pixel value if FT using exp, then store symmetric value in image
+      if isFT:
+        pixelValue = np.exp(pixelValue)
+        image[ySize-1-y2][xSize-1-x2] = pixelValue
+
+      #replace pixel value with modulated one
+      image[y2][x2] = pixelValue
 
 
 
